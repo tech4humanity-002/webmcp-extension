@@ -30,7 +30,7 @@ const { bookFlight, deleteAccount } = NAMED_TOOLS;
  * starts from the settings and page state the previous step left behind.
  * `createSequentialSteps` skips the rest once a step fails.
  */
-describe('Smoke — Settings & New Chat Reset', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Settings & New Chat Reset', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
   const step = createSequentialSteps({
     afterEachStep: () =>

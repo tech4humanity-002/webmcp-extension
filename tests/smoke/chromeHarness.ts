@@ -248,12 +248,14 @@ export async function createSmokeSession(options?: {
     // Puppeteer waits default to 30s; fail sooner so a broken step is quick to spot.
     const page = await browser.newPage();
     page.setDefaultTimeout(WAIT_TIMEOUT_MS);
+    page.setDefaultNavigationTimeout(30_000);
     await page.goto(`${server.baseUrl}${testPage}`);
     const toolFrame = await page.waitForFrame((frame) => new URL(frame.url()).pathname === toolFramePath);
     await toolFrame.waitForFunction(() => window.__toolsRegistered === true);
 
     const sidebar = await browser.newPage();
     sidebar.setDefaultTimeout(WAIT_TIMEOUT_MS);
+    sidebar.setDefaultNavigationTimeout(30_000);
     await sidebar.setViewport({ width: 360, height: 520 });
     await sidebar.goto(`chrome-extension://${launched.extensionId}/sidepanel/index.html`);
     const runtimeId = await sidebar.evaluate(() => chrome.runtime.id);

@@ -53,7 +53,7 @@ For an allowlisted call, the extension:
 
 Chrome 156 returned structured WebMCP object results as JSON strings in the live fixture. The shared invoker now redacts sensitive keys inside those JSON-serialized results while preserving ordinary text strings. Receipts include a run ID, source revision, environment, origin, tool name, policy decision, timestamps, outcome, redacted result summary and error code. They do not store raw arguments or returned page data. The extension settings screen shows the receipt count and exports the records as JSON.
 
-Receipt writes are serialised in the extension context to prevent concurrent read-modify-write operations from dropping records. A pending receipt is retained if final persistence fails after dispatch. The UI tells the model not to retry automatically when dispatch occurred but a final receipt could not be saved or the result is uncertain.
+Receipt writes are serialised in the extension context to prevent concurrent read-modify-write operations from dropping records. A pending receipt is retained if final persistence fails after dispatch. On extension startup and before a new dispatch, stale pending receipts older than 15 seconds are reconciled to UNKNOWN with errorCode `interrupted-execution-unverified`; the recovery marker is idempotent and never infers success or replays the tool. Active in-process runs are excluded from reconciliation, and a 15-second grace period avoids prematurely classifying a fresh pending call as interrupted. Any future write-capability path must block a matching unresolved prior execution until its external outcome is verified; this read-only trial has no write executor. Settings surfaces pending or unverified outcomes and warns the user to check page state before retrying. The UI also tells the model not to retry automatically when dispatch occurred but a final receipt could not be saved or the result is uncertain.
 
 ## Important limitations
 
@@ -62,7 +62,7 @@ Receipt writes are serialised in the extension context to prevent concurrent rea
 - Only the top frame is permitted. Same-origin and cross-origin iframe authority is not yet independently established by this trial.
 - The allowlist is build-time configuration, not a remotely managed policy service.
 - The extension's upstream permission prompt remains a separate user-experience control. The T4H gate is the final execution authority for this trial.
-- The receipt ledger is local to the browser profile and capped at 500 entries. Export it if longer retention is required.
+- The receipt ledger is local to the browser profile and capped at 500 entries. Export it if longer retention is required. An UNKNOWN outcome remains UNKNOWN even after the user verifies the external state; the current trial does not offer a manual acknowledgement workflow.
 - The trial profile has no write-capability pathway. A future write-capability design must define authority, consent, risk, idempotency, recovery and verification separately; it must not simply reuse the read-only invoker.
 
 ## Tests

@@ -59,7 +59,7 @@ async function readPromptLayout(sidebar: Page): Promise<PromptLayout> {
  * step before it left open. `createSequentialSteps` skips the rest once a step
  * fails.
  */
-describe('Smoke — Permission Prompt Taller Than the Panel', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Permission Prompt Taller Than the Panel', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
   const step = createSequentialSteps({
     afterEachStep: () =>

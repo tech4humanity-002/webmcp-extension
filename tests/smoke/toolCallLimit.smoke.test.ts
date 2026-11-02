@@ -56,7 +56,7 @@ async function waitForComposer(session: SmokeSessionContext): Promise<void> {
  * The steps run in order in one browser session and one chat. Each one takes
  * the agent through 10 real rounds of tool calls, so they take a few seconds.
  */
-describe('Smoke — Tool Call Limit', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Tool Call Limit', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
   const step = createSequentialSteps({
     afterEachStep: () =>

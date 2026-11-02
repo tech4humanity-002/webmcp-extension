@@ -261,6 +261,10 @@ test('SettingsScreen renders policy status and capability receipt export', () =>
       onDeviceModel: false,
       onToggleOnDeviceModel: () => { },
       onDeviceModelSupported: true,
+      receiptCount: 3,
+      unresolvedReceiptCount: 1,
+      policyStatus: 'Enforced: read-only trial',
+      onExportReceipts: () => { },
       onClose: () => { },
     })
   );
@@ -271,6 +275,10 @@ test('SettingsScreen renders policy status and capability receipt export', () =>
   assert.ok(html.includes('Get a prompt before tools make changes to your data or accounts'));
   assert.ok(html.includes('aria-label="Close settings"'));
   assert.ok(html.includes('cdds-switch--checked'));
+  assert.ok(html.includes('Enforced: read-only trial'));
+  assert.ok(html.includes('3<!-- --> capability receipt'));
+  assert.ok(html.includes('execution outcome') && html.includes('pending or unverified'));
+  assert.ok(html.includes('Export capability receipts'));
 });
 
 test('AllowToolPermissionCard renders shield icon, title, tool details, and allow/deny buttons', () => {

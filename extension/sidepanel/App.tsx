@@ -19,7 +19,7 @@ import { useActiveTabId } from './hooks/useActiveTabId.js';
 import { useActiveTabTools } from './hooks/useActiveTabTools.js';
 import { useAgentSession } from './hooks/useAgentSession.js';
 import { type ContextUsage, isPromptApiSupported, prepareOnDeviceModel } from './services/promptApiBackend.js';
-import { downloadCapabilityReceipts, getCapabilityReceipts } from './services/t4h/receiptLedger.js';
+import { downloadCapabilityReceipts, getCapabilityReceipts, isUnresolvedCapabilityReceipt, reconcilePendingCapabilityReceipts } from './services/t4h/receiptLedger.js';
 import { T4H_ALLOWED_ORIGINS, T4H_POLICY_ENABLED, T4H_TRIAL_ORIGIN } from './services/t4h/policy.js';
 
 /** Starts the on-device model download; a failure only means it starts later, with the first message. */
@@ -38,6 +38,7 @@ export function App() {
   );
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [receiptCount, setReceiptCount] = useState<number>(0);
+  const [unresolvedReceiptCount, setUnresolvedReceiptCount] = useState<number>(0);
   const [sensitiveActionAlerts, setSensitiveActionAlerts] = useState<boolean>(() => {
     const saved = localStorage.getItem('sensitiveActionAlerts');
     return saved !== null ? saved === 'true' : true;
@@ -109,11 +110,15 @@ export function App() {
   };
 
   useEffect(() => {
-    if (!showSettings) return;
     let active = true;
-    void getCapabilityReceipts()
-      .then((receipts) => { if (active) setReceiptCount(receipts.length); })
-      .catch((error) => console.warn('[WebMCP] Could not read T4H capability receipts:', error));
+    void reconcilePendingCapabilityReceipts()
+      .then(() => getCapabilityReceipts())
+      .then((receipts) => {
+        if (!active) return;
+        setReceiptCount(receipts.length);
+        setUnresolvedReceiptCount(receipts.filter(isUnresolvedCapabilityReceipt).length);
+      })
+      .catch((error) => console.warn('[WebMCP] Could not reconcile or read T4H capability receipts:', error));
     return () => { active = false; };
   }, [showSettings]);
 
@@ -187,6 +192,7 @@ export function App() {
             onDeviceModelSupported={onDeviceModelSupported}
             responseInProgress={anyBusy}
             receiptCount={receiptCount}
+            unresolvedReceiptCount={unresolvedReceiptCount}
             policyStatus={T4H_POLICY_ENABLED
               ? T4H_ALLOWED_ORIGINS.length > 0
                 ? `Enforced: read-only trial for ${T4H_TRIAL_ORIGIN}`

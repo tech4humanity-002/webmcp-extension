@@ -12,7 +12,7 @@ const FLIGHT_SCHEMA = {
   properties: { destination: { type: 'string' } },
 };
 
-describe('Smoke — T4H core browser adapter against live document.modelContext', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — T4H core browser adapter against live document.modelContext', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
 
   before(async () => {

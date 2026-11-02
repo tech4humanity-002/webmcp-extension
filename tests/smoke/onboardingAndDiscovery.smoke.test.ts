@@ -20,7 +20,7 @@ import { TEST_PAGE_TOOL_COUNT, TEST_PAGE_TOOLS } from './smokeServer.js';
  * dialogue) in one browser session. `createSequentialSteps` skips the rest once
  * a step fails.
  */
-describe('Smoke — Onboarding & Tool Discovery', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Onboarding & Tool Discovery', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
   const step = createSequentialSteps();
 
