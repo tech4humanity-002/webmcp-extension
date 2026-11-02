@@ -62,7 +62,7 @@ There are a number of possible annotations you can set:
   </tr>
 </table>
 
-In a T4H policy-enabled build, the deployment-owned gate is authoritative. The current trial profile permits only the configured origin's exact `get_flights` read-only capability. Write tools remain blocked even if the user accepts the upstream permission prompt; iframe execution is blocked until frame origin and policy can be independently verified. If `T4H_TRIAL_ORIGIN` is empty, the policy fails closed and blocks all page tools.
+In a T4H policy-enabled build, the deployment-owned gate is authoritative. The shared invoker redacts sensitive keys in JSON-serialized structured results returned by Chrome 156 while preserving ordinary text-string results. The current trial profile permits only the configured origin's exact `get_flights` read-only capability. Write tools remain blocked even if the user accepts the upstream permission prompt; iframe execution is blocked until frame origin and policy can be independently verified. If `T4H_TRIAL_ORIGIN` is empty, the policy fails closed and blocks all page tools.
 
 There are rules that apply to all of your tools, regardless of the annotations
 you may set:

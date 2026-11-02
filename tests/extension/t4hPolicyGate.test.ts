@@ -117,3 +117,16 @@ test('a timed-out page handler is recorded as uncertain and marked as dispatched
   assert.equal(result.evidence.dispatched, true);
   assert.equal(result.receipt.outcome, 'timeout');
 });
+
+
+test('JSON-serialized Chrome results redact sensitive fields before returning and recording a receipt', async () => {
+  const result = await executeThroughT4HPolicy({
+    ...base,
+    executeTabTool: async () => JSON.stringify({ authorization: 'private', matches: 2 }),
+  });
+  assert.equal(result.outcome, 'success');
+  assert.equal(result.value, JSON.stringify({ authorization: '[REDACTED]', matches: 2 }));
+  assert.equal((result.receipt.resultSummary as { type: string }).type, 'json-string');
+  assert.deepEqual((result.receipt.resultSummary as { keys: string[] }).keys, ['authorization', 'matches']);
+  assert.equal(JSON.stringify(result.receipt).includes('private'), false);
+});

@@ -9,6 +9,13 @@ const stable = (value) => Array.isArray(value)
 
 function resultSummary(value) {
   if (value === null || value === undefined) return { type: 'null' };
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object') return { type: 'json-string', keys: Object.keys(parsed).slice(0, 40) };
+    } catch {}
+    return { type: 'string' };
+  }
   if (Array.isArray(value)) return { type: 'array', itemCount: value.length };
   if (typeof value === 'object') return { type: 'object', keys: Object.keys(value).slice(0, 40) };
   return { type: typeof value };
