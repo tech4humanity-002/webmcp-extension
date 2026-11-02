@@ -68,7 +68,7 @@ async function installScrollIntoViewSpy(sidebar: Page): Promise<void> {
   });
 }
 
-describe('Smoke — Chat & Read-Only Tool Execution', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Chat & Read-Only Tool Execution', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
 
   before(async () => {

@@ -28,7 +28,7 @@ import { applySpotlighting, applyTokenLimit, waitForToolsToSettle } from '../ser
 import { DEFAULT_TOOL_ROUND_LIMITS, ToolRoundLimitError, type ToolRoundLimits } from '../services/toolRoundLimits.js';
 import { executeThroughT4HPolicy, matchT4HPolicy } from '../services/t4h/chrome-agent-gate.mjs';
 import { T4H_ALLOWED_ORIGINS, T4H_ALLOWED_TOOLS, T4H_ENVIRONMENT, T4H_POLICY_ENABLED, T4H_SOURCE_REVISION } from '../services/t4h/policy.js';
-import { beginCapabilityReceipt, saveCapabilityReceipt } from '../services/t4h/receiptLedger.js';
+import { beginCapabilityReceipt, reconcilePendingCapabilityReceipts, saveCapabilityReceipt } from '../services/t4h/receiptLedger.js';
 import {
   type ActivityEntry,
   type ChatMessage,
@@ -475,6 +475,12 @@ export function useAgentSession(
         };
 
         if (T4H_POLICY_ENABLED) {
+          try {
+            await reconcilePendingCapabilityReceipts();
+          } catch {
+            completeActivity(entry);
+            return toolResponse(call, { error: 'T4H could not reconcile prior execution receipts. No page tool was dispatched.' });
+          }
           // Re-read the live tab URL immediately before dispatch. The tab store
           // can lag a navigation; a stale origin must never authorise the new page.
           const liveTab = await getTabInfo(turnTabId);

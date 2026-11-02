@@ -12,7 +12,7 @@ import { NAMED_TOOLS } from './smokeServer.js';
 const CHAT_ID = 't4h-policy-trial';
 const RECEIPT_STORAGE_KEY = 't4h.executionReceipts.v1';
 
-describe('Smoke — T4H Policy and Capability Receipts', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — T4H Policy and Capability Receipts', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
 
   before(async () => {

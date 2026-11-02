@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { beginCapabilityReceipt, exportCapabilityReceiptsJson, getCapabilityReceipts, saveCapabilityReceipt } from '../../extension/sidepanel/services/t4h/receiptLedger.js';
+import { beginCapabilityReceipt, exportCapabilityReceiptsJson, getCapabilityReceipts, isUnresolvedCapabilityReceipt, reconcilePendingCapabilityReceipts, saveCapabilityReceipt } from '../../extension/sidepanel/services/t4h/receiptLedger.js';
 import type { T4HExecutionReceipt } from '../../extension/sidepanel/services/t4h/chrome-agent-gate.mjs';
 
 function receipt(runId: string, outcome: T4HExecutionReceipt['outcome'] = 'unknown'): T4HExecutionReceipt {
@@ -83,6 +83,59 @@ test('concurrent receipt writes are serialized without dropping records', async 
     const receipts = await getCapabilityReceipts();
     assert.equal(receipts.length, 25);
     assert.equal(new Set(receipts.map((item) => item.runId)).size, 25);
+  } finally {
+    store.restore();
+  }
+});
+
+
+test('startup recovery marks stale pending executions UNKNOWN and is idempotent', async () => {
+  const store = installStorage();
+  try {
+    const pending = receipt('interrupted-run');
+    store.data['t4h.executionReceipts.v1'] = [pending];
+    assert.equal(isUnresolvedCapabilityReceipt(pending), true);
+
+    const recovered = await reconcilePendingCapabilityReceipts(new Date('2026-11-03T00:00:00.000Z'));
+    assert.equal(recovered.length, 1);
+    assert.equal(recovered[0].runId, 'interrupted-run');
+    assert.equal(recovered[0].outcome, 'unknown');
+    assert.equal(recovered[0].errorCode, 'interrupted-execution-unverified');
+    assert.equal(recovered[0].finishedAt, '2026-11-03T00:00:00.000Z');
+    assert.equal((recovered[0].policyDecision.recovery as { status: string }).status, 'unverified');
+    assert.equal(isUnresolvedCapabilityReceipt(recovered[0]), true);
+
+    const secondPass = await reconcilePendingCapabilityReceipts(new Date('2026-11-03T00:01:00.000Z'));
+    assert.equal(secondPass.length, 0, 'A recovered receipt must not be reconciled twice');
+    assert.equal((await getCapabilityReceipts())[0].outcome, 'unknown');
+  } finally {
+    store.restore();
+  }
+});
+
+test('an active in-process pending receipt is not mistaken for a crashed execution', async () => {
+  const store = installStorage();
+  try {
+    const pending = receipt('active-run');
+    await beginCapabilityReceipt(pending);
+    const recovered = await reconcilePendingCapabilityReceipts(new Date('2026-11-03T00:01:00.000Z'));
+    assert.equal(recovered.length, 0);
+    assert.equal((await getCapabilityReceipts())[0].errorCode, 'dispatch-started');
+    await saveCapabilityReceipt(receipt('active-run', 'success'));
+  } finally {
+    store.restore();
+  }
+});
+
+
+test('fresh pending receipts remain pending during the reconciliation grace period', async () => {
+  const store = installStorage();
+  try {
+    const pending = { ...receipt('fresh-run'), startedAt: '2026-11-03T00:00:10.000Z' };
+    store.data['t4h.executionReceipts.v1'] = [pending];
+    const recovered = await reconcilePendingCapabilityReceipts(new Date('2026-11-03T00:00:20.000Z'));
+    assert.equal(recovered.length, 0);
+    assert.equal((await getCapabilityReceipts())[0].errorCode, 'dispatch-started');
   } finally {
     store.restore();
   }

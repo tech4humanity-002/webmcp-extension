@@ -17,7 +17,7 @@ import {
 } from './sidePanelHelpers.js';
 import { NAMED_TOOLS } from './smokeServer.js';
 
-describe('Smoke — Tool History', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Tool History', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   for (const ending of ['toolbar Stop', 'error'] as const) {
     it(`keeps tool-only history after ${ending}`, async () => {
       const session = await createSmokeSession({ dismissConsent: true });

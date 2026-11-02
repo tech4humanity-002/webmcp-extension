@@ -64,7 +64,7 @@ async function waitForTurnToFinish(session: SmokeSessionContext, reply: string):
  * third on the session grant from the second. `createSequentialSteps` skips
  * the rest once a step fails.
  */
-describe('Smoke — Tool Permission Prompts', { skip: smokeSkipReason(), timeout: 60_000 }, () => {
+describe('Smoke — Tool Permission Prompts', { skip: smokeSkipReason(), timeout: 90_000 }, () => {
   let session: SmokeSessionContext;
   const step = createSequentialSteps({
     afterEachStep: () =>

@@ -16,6 +16,7 @@ export interface SettingsScreenProps {
   /** A response is being generated, which the model must not change under. */
   responseInProgress?: boolean;
   receiptCount?: number;
+  unresolvedReceiptCount?: number;
   policyStatus?: string;
   onExportReceipts?: () => void;
   onClose: () => void;
@@ -33,6 +34,7 @@ export function SettingsScreen({
   onDeviceModelSupported,
   responseInProgress = false,
   receiptCount = 0,
+  unresolvedReceiptCount = 0,
   policyStatus = 'Not configured',
   onExportReceipts,
   onClose,
@@ -96,6 +98,11 @@ export function SettingsScreen({
               <p className="settings-item__desc">
                 {receiptCount} capability receipt{receiptCount === 1 ? '' : 's'} stored locally in this extension. Receipts contain execution metadata, not tool inputs or returned page data.
               </p>
+              {unresolvedReceiptCount > 0 && (
+                <p className="settings-item__desc" role="alert">
+                  {unresolvedReceiptCount} execution outcome{unresolvedReceiptCount === 1 ? ' is' : 's are'} pending or unverified. Check the page state before retrying.
+                </p>
+              )}
               {onExportReceipts && (
                 <button
                   type="button"
