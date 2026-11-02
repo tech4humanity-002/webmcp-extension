@@ -51,7 +51,8 @@ async function runTests(): Promise<void> {
     const compiledFiles = sourceFiles.map((sourceFile) =>
       path.join(outputDir, path.relative(testsDir, sourceFile).replace(/\.ts$/, '.js'))
     );
-    const result = spawnSync(process.execPath, ['--test', ...compiledFiles], {
+    const testArgs = ['--test', ...(directories.includes('smoke') ? ['--test-concurrency=1'] : []), ...compiledFiles];
+    const result = spawnSync(process.execPath, testArgs, {
       cwd: rootDir,
       stdio: 'inherit',
     });

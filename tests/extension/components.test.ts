@@ -253,7 +253,7 @@ test('Switch renders checked and unchecked states with accessibility attributes'
   assert.ok(uncheckedHtml.includes('aria-checked="false"'));
 });
 
-test('SettingsScreen renders header, permissions section, sensitive action alerts, and switch', () => {
+test('SettingsScreen renders policy status and capability receipt export', () => {
   const html = renderToString(
     React.createElement(SettingsScreen, {
       sensitiveActionAlerts: true,

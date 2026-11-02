@@ -1,9 +1,8 @@
-# Example Agentic Chrome Extension to test WebMCP
+# T4H WebMCP Extension
 
-This repository contains an example AI agent built as a Chrome extension.
-You can interact with the agent in a side panel and complete website
-tasks by calling the page's WebMCP tools. Use this extension to understand
-how WebMCP tools work on your site.
+This repository is a T4H-controlled fork of Google's [WebMCP example extension](https://github.com/GoogleChromeLabs/webmcp-extension). It retains the upstream browser agent and adds a deployment-owned execution policy, a fail-closed read-only trial profile, and locally stored capability receipts.
+
+The extension runs in a Chrome side panel and interacts with page capabilities registered through WebMCP. The T4H additions are an implementation trial, not an official WebMCP or MCP specification.
 
 > **Disclaimer**: This is not an officially supported Google product.
 > This project is not eligible for the [Google Open Source Software Vulnerability Rewards Program](https://bughunters.google.com/open-source-security).
@@ -41,11 +40,7 @@ the web pages and the website are likely to be untrusted by the agent.
 This trust boundary exists to prevent bad actors from using malicious
 manifests or contaminated outputs to attack the agent or user.
 
-Tools can carry _annotations_, hints that tell the agent about each tool.
-We built this extension to always trust these annotations (or hints)
-when determining how careful to be when taking actions. This is intentional,
-as we want to demonstrate how agents may treat your tools differently
-based on the annotations.
+Tools can carry _annotations_, hints that describe their behaviour. The upstream example uses these hints in its permission experience. The T4H execution policy does not treat page annotations as authority: a tool can execute in the T4H trial only when its exact origin, name and input schema match deployment-owned policy immediately before dispatch.
 
 There are a number of possible annotations you can set:
 
@@ -66,6 +61,8 @@ There are a number of possible annotations you can set:
     <td align="center"><sub><code>consequentialHint: true</code>: the user is always asked</sub></td>
   </tr>
 </table>
+
+In a T4H policy-enabled build, the deployment-owned gate is authoritative. The current trial profile permits only the configured origin's exact `get_flights` read-only capability. Write tools remain blocked even if the user accepts the upstream permission prompt; iframe execution is blocked until frame origin and policy can be independently verified. If `T4H_TRIAL_ORIGIN` is empty, the policy fails closed and blocks all page tools.
 
 There are rules that apply to all of your tools, regardless of the annotations
 you may set:
@@ -105,6 +102,14 @@ Read more about [building safer agents](https://developer.chrome.com/docs/agents
 - Google Chrome 155+
 - Enable `chrome://flags/#enable-webmcp-testing` and learn more about
   [how Chrome flags work](https://developer.chrome.com/docs/web-platform/chrome-flags)
+
+## T4H execution policy
+
+The official build enables the T4H policy gate. Set `T4H_TRIAL_ORIGIN` in `.env` to the exact origin used for a controlled read-only trial, for example `https://trial.example.test`. Do not include a path or trailing slash. The only currently configured trial tool is `get_flights` with the `destination` string input. The page's registered schema must match the deployment policy exactly.
+
+The gate checks the live tab origin immediately before dispatch, rejects origin changes, schema drift, invalid inputs, oversized payloads and unverified frames, and writes a pending receipt before dispatch. A final receipt records the outcome and redacted metadata. Receipts are stored in `chrome.storage.local` and can be exported from **Settings → T4H execution policy**. They are not a complete audit log of page state and do not prove external business effects beyond the observed tool result.
+
+To disable the trial capability, leave `T4H_TRIAL_ORIGIN` blank. The policy remains enabled and blocks all page tools. This is deliberate fail-closed behaviour.
 
 ## Get started
 
@@ -215,7 +220,7 @@ Set `WEBMCP_LOG_REDACT_BODIES=1` to record only method, path, status and timing.
 
 ```bash
 npm test            # unit tests and extension smoke tests
-npm run test:smoke  # only the smoke tests
+npm run test:smoke  # only the smoke tests, including the T4H browser-policy trial
 npm run typecheck
 ```
 
