@@ -7,12 +7,12 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GoogleChromeLabs/webmcp-extension.git"
+    "url": "git+https://github.com/tech4humanity-002/webmcp-extension.git"
   },
   "bugs": {
-    "url": "https://github.com/GoogleChromeLabs/webmcp-extension/issues"
+    "url": "https://github.com/tech4humanity-002/webmcp-extension/issues"
   },
-  "homepage": "https://github.com/GoogleChromeLabs/webmcp-extension#readme",
+  "homepage": "https://github.com/tech4humanity-002/webmcp-extension#readme",
   "engines": {
     "node": ">=22.18"
   },

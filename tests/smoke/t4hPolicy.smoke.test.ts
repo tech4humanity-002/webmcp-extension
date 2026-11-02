@@ -36,6 +36,7 @@ describe('Smoke — T4H Policy and Capability Receipts', { skip: smokeSkipReason
 
     await submitPromptInSidebar(sidebar, 'Find flights to Tokyo');
     const executed = await waitForExecutedToolCount(page, 1);
+    await sidebar.waitForFunction((text) => document.body.innerText.includes(text), SIDEBAR_POLLING, 'I found the available flight.');
     assert.deepEqual(executed, [{ name: NAMED_TOOLS.getFlights.name, args: { destination: 'Tokyo' } }]);
 
     await sidebar.waitForFunction(async (key) => {
@@ -56,6 +57,18 @@ describe('Smoke — T4H Policy and Capability Receipts', { skip: smokeSkipReason
     assert.equal(receipt.sourceRevision, 'smoke-test');
     assert.equal(JSON.stringify(receipt).includes('Tokyo'), false, 'Receipt must not contain raw tool arguments');
     assert.equal(JSON.stringify(receipt).includes('$650'), false, 'Receipt must not contain raw tool output');
+    assert.equal(JSON.stringify(receipt).includes('fixture-secret'), false, 'Receipt must not contain sensitive fixture data');
+    assert.equal((receipt.resultSummary as { type: string }).type, 'json-string');
+    assert.deepEqual((receipt.resultSummary as { keys: string[] }).keys, ['flights', 'authorization']);
+
+    const toolResponse = server.chatRequests
+      .flatMap((request) => request.toolResponses ?? [])
+      .find((entry) => entry.functionResponse.name === frame0ToolName('get_flights'));
+    assert.ok(toolResponse, 'Expected the extension to send the tool result back to the model');
+    assert.equal(typeof toolResponse.functionResponse.response.result, 'string');
+    const modelVisibleResult = JSON.parse(toolResponse.functionResponse.response.result as string);
+    assert.equal(modelVisibleResult.authorization, '[REDACTED]', 'Sensitive data must be redacted before the model receives the result');
+    assert.equal(JSON.stringify(modelVisibleResult).includes('fixture-secret'), false);
   });
 
   it('records a policy denial without prompting for a write tool that deployment policy excludes', async () => {

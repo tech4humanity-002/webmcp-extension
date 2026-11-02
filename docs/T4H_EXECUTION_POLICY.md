@@ -51,7 +51,7 @@ For an allowlisted call, the extension:
 6. Calls the existing extension `executeTabTool` adapter through the read-only invoker.
 7. Bounds the result, redacts sensitive fields and writes a final receipt.
 
-Receipts include a run ID, source revision, environment, origin, tool name, policy decision, timestamps, outcome, redacted result summary and error code. They do not store raw arguments or returned page data. The extension settings screen shows the receipt count and exports the records as JSON.
+Chrome 156 returned structured WebMCP object results as JSON strings in the live fixture. The shared invoker now redacts sensitive keys inside those JSON-serialized results while preserving ordinary text strings. Receipts include a run ID, source revision, environment, origin, tool name, policy decision, timestamps, outcome, redacted result summary and error code. They do not store raw arguments or returned page data. The extension settings screen shows the receipt count and exports the records as JSON.
 
 Receipt writes are serialised in the extension context to prevent concurrent read-modify-write operations from dropping records. A pending receipt is retained if final persistence fails after dispatch. The UI tells the model not to retry automatically when dispatch occurred but a final receipt could not be saved or the result is uncertain.
 
@@ -78,7 +78,7 @@ The upstream smoke suite runs with the T4H trial policy disabled so it continues
 
 ## Source provenance
 
-The browser-agent base is forked from [`GoogleChromeLabs/webmcp-extension`](https://github.com/GoogleChromeLabs/webmcp-extension). The T4H policy core and browser adapter are vendored from `tech4humanity-002/webMCP`, branch `work/controlled-chrome-agent-integration`, commit `63510d9952551cdbb7628887229c27816df74ea4`. The vendored files are `trial-core.mjs` and `browser-adapter.mjs`; the Chrome agent gate and extension integration are T4H-specific adapters.
+The browser-agent base is forked from [`GoogleChromeLabs/webmcp-extension`](https://github.com/GoogleChromeLabs/webmcp-extension). The T4H policy core and browser adapter are vendored from `tech4humanity-002/webMCP`, main at commit `e4358afa4130bed28f0a76bb9676208621117236` (including the JSON-string result redaction fix). The vendored files are `trial-core.mjs` and `browser-adapter.mjs`; the Chrome agent gate and extension integration are T4H-specific adapters.
 
 ## Release boundary
 

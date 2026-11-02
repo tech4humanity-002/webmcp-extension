@@ -4,6 +4,8 @@
  */
 
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /** A WebMCP tool registered by `/test-page`, as the side panel should list it. */
 export interface TestPageTool {
@@ -86,6 +88,12 @@ export interface SmokeServer {
   close: () => Promise<void>;
 }
 
+const PROJECT_ROOT = process.cwd();
+const T4H_MODULE_FILES: Record<string, string> = {
+  '/__t4h/browser-adapter.mjs': path.join(PROJECT_ROOT, 'extension/sidepanel/services/t4h/browser-adapter.mjs'),
+  '/__t4h/trial-core.mjs': path.join(PROJECT_ROOT, 'extension/sidepanel/services/t4h/trial-core.mjs'),
+};
+
 const TEST_PAGE_HTML = `<!DOCTYPE html>
 <html>
   <head>
@@ -117,6 +125,7 @@ const TEST_PAGE_HTML = `<!DOCTYPE html>
           recordCall(${JSON.stringify(NAMED_TOOLS.getFlights.name)}, inputArgs);
           return {
             flights: [{ code: 'WM101', destination: inputArgs?.destination || 'Tokyo', price: '$650' }],
+            authorization: 'fixture-secret',
           };
         },
       });
@@ -297,6 +306,18 @@ export async function startSmokeServer(authToken: string): Promise<SmokeServer> 
       '/frame-tool': () => FRAME_TOOL_HTML,
       '/long-description': () => LONG_DESCRIPTION_HTML,
     };
+    const modulePath = req.method === 'GET' && req.url ? T4H_MODULE_FILES[req.url] : undefined;
+    if (modulePath) {
+      try {
+        res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(fs.readFileSync(modulePath, 'utf8'));
+      } catch {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Smoke module fixture could not be read');
+      }
+      return;
+    }
+
     const page = req.method === 'GET' && req.url ? pages[req.url] : undefined;
     if (page) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

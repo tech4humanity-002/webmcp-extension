@@ -323,8 +323,9 @@ export async function invokeAllowedReadOnlyTool({
     maxInputBytes,
     maxOutputBytes,
     handler: async canonical => {
-      // Chrome 155+ uses plain object input. The result is any
-      // JSON-serialisable value, not necessarily a JSON-encoded string.
+      // Chrome 155+ uses plain object input. Chrome 156 returned structured
+      // fixture results as JSON strings; trial-core redacts sensitive keys in
+      // those serialized objects while preserving ordinary text strings.
       return await documentRef.modelContext.executeTool(selected.raw, canonical);
     }
   });

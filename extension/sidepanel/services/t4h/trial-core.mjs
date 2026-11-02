@@ -81,6 +81,19 @@ export function redactSensitive(value) {
   return result;
 }
 
+function redactToolOutput(value) {
+  if (typeof value !== "string") return redactSensitive(value);
+  // Chrome 156 returns structured WebMCP executeTool results as JSON strings.
+  // Redact those structures without changing ordinary text-string results.
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === "object") {
+      return JSON.stringify(redactSensitive(parsed));
+    }
+  } catch {}
+  return value;
+}
+
 export function createExecutionReceipt({
   runId, sourceRevision = "UNKNOWN", environment = "UNKNOWN",
   origin, toolName, policyDecision, startedAt, finishedAt,
@@ -146,7 +159,7 @@ export async function invokeReadOnlyTool({
     let redacted;
     let outputJson;
     try {
-      redacted = redactSensitive(value);
+      redacted = redactToolOutput(value);
       outputJson = JSON.stringify(redacted ?? null);
     } catch {
       return { outcome: "failed", reason: "output-not-json-serializable" };
