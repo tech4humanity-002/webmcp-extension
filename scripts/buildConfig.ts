@@ -39,6 +39,12 @@ export interface ExtensionBuildConfig extends ContentScriptBuildConfig {
    * and `extension/sidepanel/devBuildErrors.ts` to the side panel.
    */
   reloadUrl?: string;
+  /** T4H policy is enabled for every official extension build. */
+  t4hPolicyEnabled?: boolean;
+  /** Exact deployment-owned origin allowed for the read-only trial. */
+  t4hTrialOrigin?: string;
+  /** Git source revision embedded in execution receipts. */
+  t4hSourceRevision?: string;
 }
 
 /**
@@ -57,7 +63,7 @@ export function createContentScriptBuildOptions({ rootDir, outDir }: ContentScri
 /**
  * The esbuild options for every bundle of the extension.
  */
-export function createBuildOptions({ rootDir, outDir, authToken, serverUrl, reloadUrl }: ExtensionBuildConfig): BuildOptions[] {
+export function createBuildOptions({ rootDir, outDir, authToken, serverUrl, reloadUrl, t4hPolicyEnabled = false, t4hTrialOrigin = '', t4hSourceRevision = 'UNPINNED' }: ExtensionBuildConfig): BuildOptions[] {
   return [
     {
       entryPoints: [path.join(rootDir, 'extension/sidepanel/index.tsx')],
@@ -69,6 +75,9 @@ export function createBuildOptions({ rootDir, outDir, authToken, serverUrl, relo
       define: {
         'process.env.WEBMCP_AUTH_TOKEN': JSON.stringify(authToken),
         'process.env.WEBMCP_SERVER_URL': JSON.stringify(serverUrl),
+        'process.env.T4H_POLICY_ENABLED': JSON.stringify(String(t4hPolicyEnabled)),
+        'process.env.T4H_TRIAL_ORIGIN': JSON.stringify(t4hTrialOrigin),
+        'process.env.T4H_SOURCE_REVISION': JSON.stringify(t4hSourceRevision),
       },
       ...(reloadUrl && { inject: [path.join(rootDir, 'extension/sidepanel/devBuildErrors.ts')] }),
     },

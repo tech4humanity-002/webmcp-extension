@@ -115,11 +115,11 @@ interface StagedExtension {
  * configured against the ephemeral smoke test server. Uses the same esbuild
  * options as `npm run build`, so the smoke tests exercise the release bundle.
  */
-async function buildStagedExtension(serverUrl: string, authToken: string): Promise<StagedExtension> {
+async function buildStagedExtension(serverUrl: string, authToken: string, t4hPolicyEnabled: boolean): Promise<StagedExtension> {
   const extDir = fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-smoke-ext-'));
   copyStaticFiles(projectRoot, extDir);
   await Promise.all(
-    createBuildOptions({ rootDir: projectRoot, outDir: extDir, authToken, serverUrl }).map((options) =>
+    createBuildOptions({ rootDir: projectRoot, outDir: extDir, authToken, serverUrl, t4hPolicyEnabled, t4hTrialOrigin: t4hPolicyEnabled ? serverUrl : '', t4hSourceRevision: 'smoke-test' }).map((options) =>
       esbuild.build(options)
     )
   );
@@ -216,9 +216,12 @@ export interface SmokeSessionContext {
 export async function createSmokeSession(options?: {
   dismissConsent?: boolean;
   testPage?: TestPagePath;
+  /** Enable the T4H exact-origin, read-only trial policy for this browser session. */
+  t4hPolicy?: boolean;
 }): Promise<SmokeSessionContext> {
   const dismissConsent = options?.dismissConsent ?? true;
   const testPage = options?.testPage ?? '/test-page';
+  const t4hPolicy = options?.t4hPolicy ?? false;
   const { toolFramePath, toolCount } = TEST_PAGES[testPage];
   const authToken = `smoke-test-${randomUUID()}`;
   const server = await startSmokeServer(authToken);
@@ -238,7 +241,7 @@ export async function createSmokeSession(options?: {
   };
 
   try {
-    staged = await buildStagedExtension(server.baseUrl, authToken);
+    staged = await buildStagedExtension(server.baseUrl, authToken, t4hPolicy);
     const launched = await launchChromeWithExtension(staged.extDir);
     browser = launched.browser;
 

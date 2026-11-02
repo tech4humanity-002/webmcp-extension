@@ -1708,3 +1708,26 @@ main {
 .tool-permission-card--consequential .tool-permission-card__btn--allow:active {
   background-color: #6d1611;
 }
+
+
+/* T4H capability receipt export */
+.settings-item--stacked {
+  align-items: flex-start;
+}
+
+.settings-export-btn {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-outline, #9aa6b2);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-blue-title);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-export-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

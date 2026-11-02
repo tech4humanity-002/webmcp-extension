@@ -26,6 +26,9 @@ import {
 } from '../services/toolPermissions.js';
 import { applySpotlighting, applyTokenLimit, waitForToolsToSettle } from '../services/toolResults.js';
 import { DEFAULT_TOOL_ROUND_LIMITS, ToolRoundLimitError, type ToolRoundLimits } from '../services/toolRoundLimits.js';
+import { executeThroughT4HPolicy, matchT4HPolicy } from '../services/t4h/chrome-agent-gate.mjs';
+import { T4H_ALLOWED_ORIGINS, T4H_ALLOWED_TOOLS, T4H_ENVIRONMENT, T4H_POLICY_ENABLED, T4H_SOURCE_REVISION } from '../services/t4h/policy.js';
+import { beginCapabilityReceipt, saveCapabilityReceipt } from '../services/t4h/receiptLedger.js';
 import {
   type ActivityEntry,
   type ChatMessage,
@@ -434,7 +437,13 @@ export function useAgentSession(
         toolFrameId,
       };
 
-      if (needsToolPermission(permissionQuery)) {
+      // Do not ask users to approve a capability the deployment policy has
+      // already excluded. The final execution gate still repeats this check
+      // against the live tab immediately before dispatch.
+      const t4hPolicyAllowsTool = !T4H_POLICY_ENABLED || (
+        toolFrameId === 0 && matchT4HPolicy({ origin, tool: targetTool, policy: T4H_ALLOWED_TOOLS }).allowed
+      );
+      if (needsToolPermission(permissionQuery) && t4hPolicyAllowsTool) {
         const decision = await askToolPermission(tabId, signal, {
           toolName: targetTool.name,
           toolDescription: targetTool.description,
@@ -459,13 +468,58 @@ export function useAgentSession(
         // Security Note: This is where you might utilize a critic to check that the
         // tool call and parameters align with the user's intent before execution.
         let movedToNewTab = false;
-        attemptedCalls++;
-        const rawRes = await executeTabTool(name, call.args, toolFrameId, turnTabId, {
-          onTabChanged: (movedTabId) => {
-            turnTabId = movedTabId;
-            movedToNewTab = true;
-          },
-        });
+        let rawRes: unknown;
+        const onTabChanged = (movedTabId: number) => {
+          turnTabId = movedTabId;
+          movedToNewTab = true;
+        };
+
+        if (T4H_POLICY_ENABLED) {
+          // Re-read the live tab URL immediately before dispatch. The tab store
+          // can lag a navigation; a stale origin must never authorise the new page.
+          const liveTab = await getTabInfo(turnTabId);
+          const liveOrigin = originOfUrl(liveTab?.url);
+          const gated = await executeThroughT4HPolicy({
+            tool: targetTool,
+            input: call.args,
+            origin: liveOrigin,
+            expectedOrigin: origin || liveOrigin,
+            allowedOrigins: T4H_ALLOWED_ORIGINS,
+            policy: T4H_ALLOWED_TOOLS,
+            tabId: turnTabId,
+            frameId: toolFrameId,
+            sourceRevision: T4H_SOURCE_REVISION,
+            environment: T4H_ENVIRONMENT,
+            onTabChanged,
+            executeTabTool: (toolName, args, frame, tab) => executeTabTool(toolName, args, frame, tab, { onTabChanged }),
+            onBeforeDispatch: beginCapabilityReceipt,
+          });
+
+          try {
+            await saveCapabilityReceipt(gated.receipt);
+          } catch (receiptError) {
+            completeActivity(entry);
+            const dispatched = gated.evidence?.dispatched === true;
+            return toolResponse(call, {
+              error: dispatched
+                ? 'The page tool was dispatched, but its final capability receipt could not be saved. Do not retry automatically; verify the page outcome first.'
+                : 'T4H policy denied execution because a durable capability receipt could not be recorded.',
+            });
+          }
+
+          if (gated.evidence?.dispatched === true) attemptedCalls++;
+          if (gated.outcome !== 'success') {
+            completeActivity(entry);
+            const uncertainDispatch = gated.evidence?.dispatched === true
+              ? ' The page handler may still be running or may have completed. Do not retry automatically; verify the page outcome first.'
+              : '';
+            return toolResponse(call, { error: `T4H policy: ${gated.reason ?? gated.outcome}.${uncertainDispatch}` });
+          }
+          rawRes = gated.value;
+        } else {
+          attemptedCalls++;
+          rawRes = await executeTabTool(name, call.args, toolFrameId, turnTabId, { onTabChanged });
+        }
         if (signal.aborted) return null;
         if (movedToNewTab) {
           const movedInfo = await getTabInfo(turnTabId);

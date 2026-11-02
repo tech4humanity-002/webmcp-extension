@@ -15,6 +15,9 @@ export interface SettingsScreenProps {
   onDeviceModelSupported: boolean;
   /** A response is being generated, which the model must not change under. */
   responseInProgress?: boolean;
+  receiptCount?: number;
+  policyStatus?: string;
+  onExportReceipts?: () => void;
   onClose: () => void;
 }
 
@@ -29,6 +32,9 @@ export function SettingsScreen({
   onToggleOnDeviceModel,
   onDeviceModelSupported,
   responseInProgress = false,
+  receiptCount = 0,
+  policyStatus = 'Not configured',
+  onExportReceipts,
   onClose,
 }: SettingsScreenProps) {
   const alertsDescId = useId();
@@ -74,6 +80,32 @@ export function SettingsScreen({
                 aria-label="Sensitive action alerts"
                 aria-describedby={alertsDescId}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* T4H execution policy and evidence */}
+        <div className="settings-section">
+          <h2 className="settings-section__title">T4H execution policy</h2>
+          <div className="settings-item settings-item--stacked">
+            <div className="settings-item__content">
+              <span className="settings-item__title">{policyStatus}</span>
+              <p className="settings-item__desc">
+                Only exact origin, tool name and input schema matches in the deployment policy can run. This trial allows read-only tools only. Writes and unverified iframe tools are blocked.
+              </p>
+              <p className="settings-item__desc">
+                {receiptCount} capability receipt{receiptCount === 1 ? '' : 's'} stored locally in this extension. Receipts contain execution metadata, not tool inputs or returned page data.
+              </p>
+              {onExportReceipts && (
+                <button
+                  type="button"
+                  className="settings-export-btn"
+                  onClick={onExportReceipts}
+                  disabled={receiptCount === 0}
+                >
+                  Export capability receipts
+                </button>
+              )}
             </div>
           </div>
         </div>

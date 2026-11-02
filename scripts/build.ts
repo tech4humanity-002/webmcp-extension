@@ -5,6 +5,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import esbuild from 'esbuild';
 import { loadDotEnv, getEnv, ensureAuthToken } from '../server/security.ts';
@@ -20,6 +21,19 @@ const authToken = ensureAuthToken(env, envPath);
 const port = getEnv(env, 'PORT') || '3000';
 const serverUrl = `http://localhost:${port}`;
 const RELOAD_PORT = 35729;
+const sourceRevision = getSourceRevision();
+
+function getSourceRevision(): string {
+  const configured = getEnv(env, 'T4H_SOURCE_REVISION');
+  if (configured) return configured;
+  try {
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim();
+    const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: rootDir, encoding: 'utf8' }).trim();
+    return dirty ? `${head}-dirty` : head;
+  } catch {
+    return 'UNPINNED';
+  }
+}
 const { name: extensionName } = JSON.parse(fs.readFileSync(path.join(rootDir, 'extension/manifest.json'), 'utf8'));
 
 const isWatch = process.argv.includes('--watch');
@@ -45,6 +59,9 @@ const buildOptions = createBuildOptions({
   authToken,
   serverUrl,
   reloadUrl: reloadServer?.url,
+  t4hPolicyEnabled: true,
+  t4hTrialOrigin: getEnv(env, 'T4H_TRIAL_ORIGIN') || '',
+  t4hSourceRevision: sourceRevision,
 });
 
 // The errors of the latest build of each bundle, empty when it succeeded. The

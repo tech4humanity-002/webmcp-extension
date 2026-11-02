@@ -19,6 +19,8 @@ import { useActiveTabId } from './hooks/useActiveTabId.js';
 import { useActiveTabTools } from './hooks/useActiveTabTools.js';
 import { useAgentSession } from './hooks/useAgentSession.js';
 import { type ContextUsage, isPromptApiSupported, prepareOnDeviceModel } from './services/promptApiBackend.js';
+import { downloadCapabilityReceipts, getCapabilityReceipts } from './services/t4h/receiptLedger.js';
+import { T4H_ALLOWED_ORIGINS, T4H_POLICY_ENABLED, T4H_TRIAL_ORIGIN } from './services/t4h/policy.js';
 
 /** Starts the on-device model download; a failure only means it starts later, with the first message. */
 async function startOnDeviceModelDownload(): Promise<void> {
@@ -35,6 +37,7 @@ export function App() {
     () => localStorage.getItem('agentConsent') !== 'true'
   );
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [receiptCount, setReceiptCount] = useState<number>(0);
   const [sensitiveActionAlerts, setSensitiveActionAlerts] = useState<boolean>(() => {
     const saved = localStorage.getItem('sensitiveActionAlerts');
     return saved !== null ? saved === 'true' : true;
@@ -105,6 +108,21 @@ export function App() {
     }
   };
 
+  useEffect(() => {
+    if (!showSettings) return;
+    let active = true;
+    void getCapabilityReceipts()
+      .then((receipts) => { if (active) setReceiptCount(receipts.length); })
+      .catch((error) => console.warn('[WebMCP] Could not read T4H capability receipts:', error));
+    return () => { active = false; };
+  }, [showSettings]);
+
+  const handleExportReceipts = () => {
+    void downloadCapabilityReceipts().catch((error) => {
+      console.error('[WebMCP] Could not export T4H capability receipts:', error);
+    });
+  };
+
   const chatStreamEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto scroll chat to bottom on new messages
@@ -168,6 +186,13 @@ export function App() {
             onToggleOnDeviceModel={handleToggleOnDeviceModel}
             onDeviceModelSupported={onDeviceModelSupported}
             responseInProgress={anyBusy}
+            receiptCount={receiptCount}
+            policyStatus={T4H_POLICY_ENABLED
+              ? T4H_ALLOWED_ORIGINS.length > 0
+                ? `Enforced: read-only trial for ${T4H_TRIAL_ORIGIN}`
+                : 'Enforced: no trial origin configured; all page tools are blocked'
+              : 'Policy not enabled in this build'}
+            onExportReceipts={handleExportReceipts}
             onClose={() => setShowSettings(false)}
           />
         ) : (
