@@ -80,7 +80,8 @@ export function validateWasameTaskContext(value: unknown): WasameTaskContext | n
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
-  if (JSON.stringify(context).length > 48_000) return null;
+  const serialized = JSON.stringify(context);
+  if (!serialized || serialized.length > 48_000) return null;
   return context;
 }
 
