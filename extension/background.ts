@@ -164,9 +164,9 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
           toolName: receipt.toolName,
           outcome: receipt.outcome,
           sourceRevision: receipt.sourceRevision,
-          startedAt: receipt.startedAt,
-          finishedAt: receipt.finishedAt,
-          errorCode: receipt.errorCode,
+          ...(receipt.startedAt ? { startedAt: receipt.startedAt } : {}),
+          ...(receipt.finishedAt ? { finishedAt: receipt.finishedAt } : {}),
+          ...(receipt.errorCode ? { errorCode: receipt.errorCode } : {}),
         }));
         sendResponse({
           protocol: WASAME_TASK_CONTEXT_PROTOCOL,
