@@ -285,3 +285,29 @@ webmcp-extension/
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+
+## Optional WASAME task-context handoff
+
+The T4H WebMCP extension can receive a bounded task-context snapshot from the WASAME extension so the same root objective, current question and evidence references are available when the user moves between tabs.
+
+This is a local Chrome extension-to-extension message contract. It is **not** an MCP endpoint, does not create a second browser agent, and does not grant tool authority.
+
+### Configure the exact sender allowlist
+
+Set `WASAME_EXTENSION_IDS` in the build environment to a comma-separated list of exact 32-character Chrome extension IDs. The build writes only those IDs into the generated `externally_connectable.ids` manifest field and injects the same allowlist into the background service worker. Empty configuration removes `externally_connectable` entirely. Wildcards are rejected.
+
+The WASAME build sets `VITE_WEBMCP_EXTENSION_ID` to this extension's exact ID. Both sides must be rebuilt and installed. An unpacked/development extension ID may differ from its store/release ID.
+
+### Supported messages
+
+All messages use protocol `wasame-webmcp-handoff.v1` and are checked against the exact sender ID again in the background service worker.
+
+- `wasame:capabilities:get`: returns extension version, T4H policy status and receipt counts.
+- `wasame:task-context:set`: validates and stores a `wasame.task-context.v1` snapshot with readback.
+- `wasame:task-context:clear`: removes the shared snapshot.
+- `wasame:receipts:get`: reconciles pending receipts and returns up to 50 metadata-only receipt summaries.
+
+The handoff never exposes raw tool inputs or outputs, invokes page tools, changes the T4H policy allowlist, or grants permissions. WASAME remains the task-context authority; the extension's storage copy is a local cache. The extension injects the latest context into each new tab conversation as untrusted reference data. Current user intent and the T4H policy remain authoritative.
+
+If no sender IDs are configured, the extension behaves exactly as before and external messaging is disabled.
