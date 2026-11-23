@@ -9,6 +9,7 @@ const temporaryRoots: string[] = [];
 function createFixture(manifest: Record<string, unknown>) {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "webmcp-wasame-build-"));
   const outDir = path.join(rootDir, "dist");
+  fs.mkdirSync(outDir, { recursive: true });
   temporaryRoots.push(rootDir);
   fs.mkdirSync(path.join(rootDir, "extension", "icons"), { recursive: true });
   fs.mkdirSync(path.join(rootDir, "extension", "sidepanel"), { recursive: true });
