@@ -26,9 +26,14 @@ afterEach(() => {
 describe("WASAME external messaging build allowlist", () => {
   it("writes only unique, exact extension IDs to externally_connectable", () => {
     const { rootDir, outDir } = createFixture({ manifest_version: 3, name: "WebMCP" });
-    copyStaticFiles(rootDir, outDir, ["wasame-id-1", "wasame-id-2", "wasame-id-1", " "]);
+    copyStaticFiles(rootDir, outDir, ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", " "]);
     const manifest = JSON.parse(fs.readFileSync(path.join(outDir, "manifest.json"), "utf8"));
-    expect(manifest.externally_connectable).toEqual({ ids: ["wasame-id-1", "wasame-id-2"] });
+    expect(manifest.externally_connectable).toEqual({ ids: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"] });
+  });
+
+  it("rejects malformed extension IDs rather than broadening the allowlist", () => {
+    const { rootDir, outDir } = createFixture({ manifest_version: 3, name: "WebMCP" });
+    expect(() => copyStaticFiles(rootDir, outDir, ["not-an-extension-id"])).toThrow("exact 32-character Chrome extension IDs");
   });
 
   it("removes external messaging entirely when no IDs are configured", () => {
