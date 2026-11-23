@@ -121,6 +121,10 @@ export function copyStaticFiles(rootDir: string, outDir: string, wasameExtension
   const manifestPath = path.join(outDir, 'manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const allowedIds = [...new Set(wasameExtensionIds.map((id) => id.trim()).filter(Boolean))];
+  const invalidIds = allowedIds.filter((id) => !/^[a-p]{32}$/.test(id));
+  if (invalidIds.length > 0) {
+    throw new Error("WASAME_EXTENSION_IDS must contain exact 32-character Chrome extension IDs");
+  }
   if (allowedIds.length > 0) manifest.externally_connectable = { ids: allowedIds };
   else delete manifest.externally_connectable;
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
