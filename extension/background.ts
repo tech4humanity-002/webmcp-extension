@@ -4,6 +4,26 @@
  */
 
 import { getAllFrameOrigins } from './frameOrigins.js';
+import {
+  WASAME_TASK_CONTEXT_KEY,
+  WASAME_TASK_CONTEXT_PROTOCOL,
+  validateWasameTaskContext,
+} from '../shared/wasameTaskContext.js';
+import {
+  getCapabilityReceipts,
+  isUnresolvedCapabilityReceipt,
+  reconcilePendingCapabilityReceipts,
+} from './sidepanel/services/t4h/receiptLedger.js';
+import {
+  T4H_ALLOWED_ORIGINS,
+  T4H_ENVIRONMENT,
+  T4H_POLICY_ENABLED,
+  T4H_SOURCE_REVISION,
+} from './sidepanel/services/t4h/policy.js';
+
+const allowedWasameExtensionIds = new Set(
+  (process.env.WASAME_EXTENSION_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
+);
 
 // Allows users to open the side panel by clicking the action icon.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -62,3 +82,105 @@ chrome.runtime.onMessage.addListener(
     }
   }
 );
+
+
+/**
+ * WASAME may hand off task context and read T4H receipt summaries.
+ * This channel never invokes page tools, changes T4H policy, or grants permissions.
+ * Chrome only delivers external messages from IDs declared in the generated
+ * manifest; the sender ID is checked again here as a second fail-closed gate.
+ */
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (!sender.id || !allowedWasameExtensionIds.has(sender.id)) {
+    sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: 'sender-not-allowlisted' });
+    return false;
+  }
+  if (!message || typeof message !== 'object' || message.protocol !== WASAME_TASK_CONTEXT_PROTOCOL) {
+    sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: 'protocol-invalid' });
+    return false;
+  }
+
+  switch (message.type) {
+    case 'wasame:capabilities:get': {
+      void (async () => {
+        const receipts = await getCapabilityReceipts();
+        sendResponse({
+          protocol: WASAME_TASK_CONTEXT_PROTOCOL,
+          ok: true,
+          version: chrome.runtime.getManifest().version,
+          sourceRevision: T4H_SOURCE_REVISION,
+          environment: T4H_ENVIRONMENT,
+          policyEnabled: T4H_POLICY_ENABLED,
+          allowedOrigins: [...T4H_ALLOWED_ORIGINS],
+          receiptCount: receipts.length,
+          unresolvedReceiptCount: receipts.filter(isUnresolvedCapabilityReceipt).length,
+          features: ['task-context-handoff', 'read-only-t4h-policy', 'receipt-readback'],
+        });
+      })().catch((error) => {
+        sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: error instanceof Error ? error.message : 'capabilities-unavailable' });
+      });
+      return true;
+    }
+    case 'wasame:task-context:set': {
+      const context = validateWasameTaskContext(message.context);
+      if (!context) {
+        sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: 'task-context-invalid' });
+        return false;
+      }
+      void (async () => {
+        await chrome.storage.local.set({ [WASAME_TASK_CONTEXT_KEY]: context });
+        const stored = await chrome.storage.local.get(WASAME_TASK_CONTEXT_KEY);
+        const readback = validateWasameTaskContext(stored[WASAME_TASK_CONTEXT_KEY]);
+        if (!readback || readback.taskId !== context.taskId || readback.updatedAt !== context.updatedAt) {
+          throw new Error('task-context-readback-failed');
+        }
+        sendResponse({
+          protocol: WASAME_TASK_CONTEXT_PROTOCOL,
+          ok: true,
+          taskId: readback.taskId,
+          rootTaskId: readback.rootTaskId,
+          updatedAt: readback.updatedAt,
+        });
+      })().catch((error) => {
+        sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: error instanceof Error ? error.message : 'task-context-store-failed' });
+      });
+      return true;
+    }
+    case 'wasame:task-context:clear': {
+      void chrome.storage.local.remove(WASAME_TASK_CONTEXT_KEY).then(() => {
+        sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: true });
+      }).catch((error) => {
+        sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: error instanceof Error ? error.message : 'task-context-clear-failed' });
+      });
+      return true;
+    }
+    case 'wasame:receipts:get': {
+      void (async () => {
+        await reconcilePendingCapabilityReceipts();
+        const receipts = await getCapabilityReceipts();
+        const summaries = receipts.slice(-50).map((receipt) => ({
+          runId: receipt.runId,
+          origin: receipt.origin,
+          toolName: receipt.toolName,
+          outcome: receipt.outcome,
+          sourceRevision: receipt.sourceRevision,
+          startedAt: receipt.startedAt,
+          finishedAt: receipt.finishedAt,
+          errorCode: receipt.errorCode,
+        }));
+        sendResponse({
+          protocol: WASAME_TASK_CONTEXT_PROTOCOL,
+          ok: true,
+          receiptCount: receipts.length,
+          receipts: summaries,
+        });
+      })().catch((error) => {
+        sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: error instanceof Error ? error.message : 'receipt-read-failed' });
+      });
+      return true;
+    }
+    default:
+      sendResponse({ protocol: WASAME_TASK_CONTEXT_PROTOCOL, ok: false, error: 'message-type-unsupported' });
+      return false;
+  }
+});
