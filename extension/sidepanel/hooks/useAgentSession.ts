@@ -15,6 +15,7 @@ import { formatErrorMessage } from '../services/backendBridge.js';
 import { endChat, getSpotlighting, sendChatTurn } from '../services/chatBridge.js';
 import { executeTabTool, getTabInfo, requestTabTools, ToolError } from '../services/extensionBridge.js';
 import { tabSessions } from '../services/tabSessionStore.js';
+import { formatWasameTaskContext, getSharedTaskContext } from '../services/wasameTaskContext.js';
 import { buildToolDecls, decodeToolName } from '../services/toolEncoder.js';
 import {
   applyToolPermissionDecision,
@@ -329,6 +330,24 @@ export function useAgentSession(
     const textToSend = state.userPrompt.trim();
     if (!textToSend) return;
 
+    let messageWithTaskContext: string;
+    try {
+      const sharedTaskContext = await getSharedTaskContext();
+      messageWithTaskContext = formatWasameTaskContext(sharedTaskContext, textToSend);
+    } catch {
+      tabSessions.update(tabId, (previous) => ({
+        messages: [
+          ...previous.messages,
+          {
+            id: generateId(),
+            role: 'error',
+            text: 'Shared task context could not be loaded. No request was sent, so cross-tab continuity is not silently lost. Refresh the WASAME task context and try again.',
+          },
+        ],
+      }));
+      return;
+    }
+
     // The browser holds a single on-device session, so two tabs cannot be
     // mid-turn on it at once. Saying so beats quietly wrecking both.
     if (onDeviceModelRef.current && tabSessions.busyTabIds().some((busyTabId) => busyTabId !== tabId)) {
@@ -579,7 +598,7 @@ export function useAgentSession(
       const toolDecls = buildToolDecls(toolsView.current);
       let currentResult: ChatTurnResponse = await sendChatTurn(
         {
-          message: textToSend,
+          message: messageWithTaskContext,
           tools: toolDecls,
           chatId: internals.chatId,
         },
