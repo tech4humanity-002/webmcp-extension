@@ -22,6 +22,7 @@ const port = getEnv(env, 'PORT') || '3000';
 const serverUrl = `http://localhost:${port}`;
 const RELOAD_PORT = 35729;
 const sourceRevision = getSourceRevision();
+const wasameExtensionIds = (getEnv(env, 'WASAME_EXTENSION_IDS') || '').split(',').map((id) => id.trim()).filter(Boolean);
 
 function getSourceRevision(): string {
   const configured = getEnv(env, 'T4H_SOURCE_REVISION');
@@ -44,7 +45,7 @@ if (!isWatch) {
 }
 fs.mkdirSync(distDir, { recursive: true });
 
-copyStaticFiles(rootDir, distDir);
+copyStaticFiles(rootDir, distDir, wasameExtensionIds);
 
 const reloadServer = isWatch
   ? await startReloadServer(RELOAD_PORT).catch((error: Error) => {
@@ -62,6 +63,7 @@ const buildOptions = createBuildOptions({
   t4hPolicyEnabled: true,
   t4hTrialOrigin: getEnv(env, 'T4H_TRIAL_ORIGIN') || '',
   t4hSourceRevision: sourceRevision,
+  wasameExtensionIds,
 });
 
 // The errors of the latest build of each bundle, empty when it succeeded. The
