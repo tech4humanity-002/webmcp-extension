@@ -37,7 +37,7 @@ const allowedExtensionId = getEnv(env, 'ALLOWED_EXTENSION_ID');
 /**
  * Which provider and model answer a turn is settled here, from `.env`, and is
  * never taken from the side panel. Set `MODEL=openai:gpt-4o`,
- * `MODEL=anthropic:claude-sonnet-4-5` or `MODEL=google:gemini-3.6-flash`; a
+ * `MODEL=anthropic:claude-sonnet-4-5` or `MODEL=google:gemini-3.8-flash`; a
  * bare model name is read as Google's, so older `.env` files still work.
  */
 const providerConfig = loadProviders(env);

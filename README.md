@@ -160,14 +160,15 @@ shows how full it is, and long chats are summarized to make room.
 `MODEL` is written as `provider:model`:
 
 ```env
-MODEL=google:gemini-3.6-flash
+MODEL=google:gemini-3.8-flash
 MODEL=openai:gpt-4o
 MODEL=anthropic:claude-sonnet-4-5
 MODEL=ollama:llama3.2
 ```
 
-- A name without a prefix is read as a Google model, so `MODEL=gemini-3.6-flash` still works.
+- A name without a prefix is read as a Google model, so `MODEL=gemini-3.8-flash` still works.
 - For Google, `GOOGLE_GENERATIVE_AI_API_KEY` (the AI SDK's own name) works as well as `GEMINI_API_KEY`.
+- The Gemini Developer API free tier includes selected models such as `gemini-3.8-flash`, but Google states free-tier content may be used to improve its products. Use only synthetic/public test data on that tier; do not send private T4H, customer, personal or production data. Paid-tier content is not used to improve Google products.
 - A provider only works if its API key is set. If it is missing, the server says so when it
   starts. Ollama runs on your machine and needs no key.
 - Restart the server after changing `MODEL`.

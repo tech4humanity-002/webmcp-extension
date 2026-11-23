@@ -84,7 +84,7 @@ test('parseModelSpec splits provider from model, and reads a bare name as Google
     modelId: 'claude-sonnet-4-5',
   });
   // An .env written before there was a choice keeps working.
-  assert.deepEqual(parseModelSpec('gemini-3.6-flash'), { providerId: 'google', modelId: 'gemini-3.6-flash' });
+  assert.deepEqual(parseModelSpec('gemini-3.8-flash'), { providerId: 'google', modelId: 'gemini-3.8-flash' });
   assert.deepEqual(parseModelSpec('  openai:gpt-4o  '), { providerId: 'openai', modelId: 'gpt-4o' });
   assert.deepEqual(parseModelSpec('OPENAI : gpt-4o'), { providerId: 'openai', modelId: 'gpt-4o' });
   // Only the first colon separates: a fine-tuned OpenAI model has its own.
@@ -115,7 +115,7 @@ test('loadProviders falls back to Gemini when .env names no model, or auto-selec
   const config = load({ GEMINI_API_KEY: 'g-test' });
 
   assert.equal(config.problem, null);
-  assert.equal(describeModel(config), 'google:gemini-3.6-flash');
+  assert.equal(describeModel(config), 'google:gemini-3.8-flash');
 
   // When only OPENAI_API_KEY or ANTHROPIC_API_KEY is set without MODEL, it works out of the box
   const openaiOnly = load({ OPENAI_API_KEY: 'sk-test' });
@@ -203,7 +203,7 @@ test('a base URL sends the request somewhere else', async () => {
     load({
       GEMINI_API_KEY: 'g-test',
       GOOGLE_GENERATIVE_AI_BASE_URL: 'http://localhost:4000/google',
-      MODEL: 'google:gemini-3.6-flash',
+      MODEL: 'google:gemini-3.8-flash',
     }),
   );
   assert.match(google, /^http:\/\/localhost:4000\/google\//);

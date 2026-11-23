@@ -13,7 +13,7 @@ import {
 } from 'react';
 import { formatErrorMessage } from '../services/backendBridge.js';
 import { endChat, getSpotlighting, sendChatTurn } from '../services/chatBridge.js';
-import { executeTabTool, getTabInfo, requestTabTools } from '../services/extensionBridge.js';
+import { executeTabTool, getTabInfo, requestTabTools, ToolError } from '../services/extensionBridge.js';
 import { tabSessions } from '../services/tabSessionStore.js';
 import { buildToolDecls, decodeToolName } from '../services/toolEncoder.js';
 import {
@@ -24,7 +24,12 @@ import {
   originOfUrl,
   type ToolPermissionDecision,
 } from '../services/toolPermissions.js';
-import { applySpotlighting, applyTokenLimit, waitForToolsToSettle } from '../services/toolResults.js';
+import {
+  applySpotlighting,
+  applyTokenLimit,
+  checkOutputSchema,
+  waitForToolsToSettle,
+} from '../services/toolResults.js';
 import { DEFAULT_TOOL_ROUND_LIMITS, ToolRoundLimitError, type ToolRoundLimits } from '../services/toolRoundLimits.js';
 import { executeThroughT4HPolicy, matchT4HPolicy } from '../services/t4h/chrome-agent-gate.mjs';
 import { T4H_ALLOWED_ORIGINS, T4H_ALLOWED_TOOLS, T4H_ENVIRONMENT, T4H_POLICY_ENABLED, T4H_SOURCE_REVISION } from '../services/t4h/policy.js';
@@ -538,6 +543,12 @@ export function useAgentSession(
           }
         }
 
+        const schemaViolation = checkOutputSchema(rawRes, targetTool);
+        if (schemaViolation) {
+          completeActivity(entry);
+          return toolResponse(call, { error: schemaViolation });
+        }
+
         const res = applySpotlighting(
           applyTokenLimit(rawRes),
           targetTool,
@@ -551,7 +562,16 @@ export function useAgentSession(
       } catch (err: unknown) {
         if (signal.aborted) return null;
         completeActivity(entry);
-        return toolResponse(call, { error: (err as Error)?.message || String(err) });
+        const message = (err as Error)?.message || String(err);
+        if (!(err instanceof ToolError)) return toolResponse(call, { error: message });
+        // What a tool threw comes from the page as much as its result does, so
+        // it is cut and spotlighted the same way before the model reads it.
+        const error = applySpotlighting(
+          applyTokenLimit(message),
+          targetTool,
+          getSpotlighting(onDeviceModelRef.current)
+        );
+        return toolResponse(call, { error: String(error) });
       }
     };
 
