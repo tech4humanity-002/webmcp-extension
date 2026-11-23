@@ -45,6 +45,8 @@ export interface ExtensionBuildConfig extends ContentScriptBuildConfig {
   t4hTrialOrigin?: string;
   /** Git source revision embedded in execution receipts. */
   t4hSourceRevision?: string;
+  /** Exact WASAME extension IDs allowed to hand off task context. Empty disables external messaging. */
+  wasameExtensionIds?: string[];
 }
 
 /**
@@ -63,7 +65,7 @@ export function createContentScriptBuildOptions({ rootDir, outDir }: ContentScri
 /**
  * The esbuild options for every bundle of the extension.
  */
-export function createBuildOptions({ rootDir, outDir, authToken, serverUrl, reloadUrl, t4hPolicyEnabled = false, t4hTrialOrigin = '', t4hSourceRevision = 'UNPINNED' }: ExtensionBuildConfig): BuildOptions[] {
+export function createBuildOptions({ rootDir, outDir, authToken, serverUrl, reloadUrl, t4hPolicyEnabled = false, t4hTrialOrigin = '', t4hSourceRevision = 'UNPINNED', wasameExtensionIds = [] }: ExtensionBuildConfig): BuildOptions[] {
   return [
     {
       entryPoints: [path.join(rootDir, 'extension/sidepanel/index.tsx')],
@@ -86,10 +88,11 @@ export function createBuildOptions({ rootDir, outDir, authToken, serverUrl, relo
       bundle: true,
       format: 'esm',
       outfile: path.join(outDir, 'background.js'),
-      ...(reloadUrl && {
-        inject: [path.join(rootDir, 'extension/devReload.ts')],
-        define: { 'process.env.WEBMCP_RELOAD_URL': JSON.stringify(reloadUrl) },
-      }),
+      define: {
+        'process.env.WASAME_EXTENSION_IDS': JSON.stringify(wasameExtensionIds.join(',')),
+        ...(reloadUrl ? { 'process.env.WEBMCP_RELOAD_URL': JSON.stringify(reloadUrl) } : {}),
+      },
+      ...(reloadUrl && { inject: [path.join(rootDir, 'extension/devReload.ts')] }),
     },
     createContentScriptBuildOptions({ rootDir, outDir }),
   ];
@@ -111,8 +114,14 @@ export function staticFiles(rootDir: string, outDir: string): Array<[string, str
 /**
  * Copies the files esbuild does not produce into `outDir`.
  */
-export function copyStaticFiles(rootDir: string, outDir: string): void {
+export function copyStaticFiles(rootDir: string, outDir: string, wasameExtensionIds: string[] = []): void {
   for (const [source, destination] of staticFiles(rootDir, outDir)) {
     fs.cpSync(source, destination, { recursive: true });
   }
+  const manifestPath = path.join(outDir, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const allowedIds = [...new Set(wasameExtensionIds.map((id) => id.trim()).filter(Boolean))];
+  if (allowedIds.length > 0) manifest.externally_connectable = { ids: allowedIds };
+  else delete manifest.externally_connectable;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 }
