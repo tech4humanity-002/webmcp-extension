@@ -330,24 +330,6 @@ export function useAgentSession(
     const textToSend = state.userPrompt.trim();
     if (!textToSend) return;
 
-    let messageWithTaskContext: string;
-    try {
-      const sharedTaskContext = await getSharedTaskContext();
-      messageWithTaskContext = formatWasameTaskContext(sharedTaskContext, textToSend);
-    } catch {
-      tabSessions.update(tabId, (previous) => ({
-        messages: [
-          ...previous.messages,
-          {
-            id: generateId(),
-            role: 'error',
-            text: 'Shared task context could not be loaded. No request was sent, so cross-tab continuity is not silently lost. Refresh the WASAME task context and try again.',
-          },
-        ],
-      }));
-      return;
-    }
-
     // The browser holds a single on-device session, so two tabs cannot be
     // mid-turn on it at once. Saying so beats quietly wrecking both.
     if (onDeviceModelRef.current && tabSessions.busyTabIds().some((busyTabId) => busyTabId !== tabId)) {
@@ -358,6 +340,30 @@ export function useAgentSession(
             id: generateId(),
             role: 'error',
             text: 'The on-device model can only answer one tab at a time. Wait for the reply in the other tab to finish, or stop it.',
+          },
+        ],
+      }));
+      return;
+    }
+
+    // Reserve this tab before the asynchronous context read so a double click
+    // cannot start two turns with the same prompt.
+    tabSessions.update(tabId, { busy: true });
+
+    let messageWithTaskContext: string;
+    try {
+      const sharedTaskContext = await getSharedTaskContext();
+      messageWithTaskContext = formatWasameTaskContext(sharedTaskContext, textToSend);
+    } catch {
+      tabSessions.update(tabId, (previous) => ({
+        busy: false,
+        userPrompt: textToSend,
+        messages: [
+          ...previous.messages,
+          {
+            id: generateId(),
+            role: 'error',
+            text: 'Shared task context could not be loaded. No request was sent, so cross-tab continuity is not silently lost. Refresh the WASAME task context and try again.',
           },
         ],
       }));
@@ -419,7 +425,6 @@ export function useAgentSession(
       internals.chatId = crypto.randomUUID();
     }
     tabSessions.update(tabId, (previous) => ({
-      busy: true,
       userPrompt: '',
       pendingPermission: null,
       pendingCheckpoint: null,
