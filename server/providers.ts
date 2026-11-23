@@ -37,7 +37,7 @@ function normalizeOllamaUrl(rawUrl: string | undefined): string {
   return /\/v1$/i.test(url) ? url : `${url}/v1`;
 }
 
-const GOOGLE_DEFAULT_MODEL = 'google:gemini-3.6-flash';
+const GOOGLE_DEFAULT_MODEL = 'google:gemini-3.8-flash';
 
 const PROVIDERS: Record<string, ProviderSpec> = {
   google: {
@@ -131,7 +131,7 @@ export function loadProviders(env: DotEnv = {}): ProviderConfig {
 
   let problem: string | null = null;
   if (!parsed) {
-    problem = `MODEL="${requested}" is not understood. Use provider:model, such as openai:gpt-4o, anthropic:claude-sonnet-4-5, google:gemini-3.6-flash or ollama:llama3.2 (known providers: ${Object.keys(PROVIDERS).join(', ')})`;
+    problem = `MODEL="${requested}" is not understood. Use provider:model, such as openai:gpt-4o, anthropic:claude-sonnet-4-5, google:gemini-3.8-flash or ollama:llama3.2 (known providers: ${Object.keys(PROVIDERS).join(', ')})`;
   } else if (configured.length === 0) {
     problem = 'No model API key found. Set GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY in .env, or use MODEL=ollama:<model> to run locally';
   } else if (!configured.includes(parsed.providerId)) {

@@ -20,6 +20,15 @@ interface ContentMessage {
   fromOrigins?: string[];
 }
 
+/**
+ * The reply to `EXECUTE_TOOL` when the tool could not run or threw. Results
+ * are strings (or null), so this shape cannot be mistaken for one. Keep in sync
+ * with `executeTabTool` in sidepanel/services/extensionBridge.ts.
+ */
+interface ToolErrorReply {
+  toolError: string;
+}
+
 chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, reply) => {
   const { action, name, inputArgs, fromOrigins = [] } = message;
   const modelContext = document.modelContext;
@@ -27,7 +36,7 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, reply) =
     chrome.runtime.sendMessage({ message: WEBMCP_DISABLED_MESSAGE });
     // A tool call still gets an answer, so the model hears why it failed
     // instead of a closed message port.
-    if (action === 'EXECUTE_TOOL') reply(JSON.stringify(WEBMCP_DISABLED_MESSAGE));
+    if (action === 'EXECUTE_TOOL') reply({ toolError: WEBMCP_DISABLED_MESSAGE } satisfies ToolErrorReply);
     return;
   }
   try {
@@ -41,7 +50,9 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, reply) =
         try {
           reply(await executeTool(modelContext, name, inputArgs));
         } catch (error) {
-          reply(JSON.stringify(toMessage(error)));
+          // Sent as an object, which a result never is, so the side panel can
+          // tell a tool that failed from one that returned a message.
+          reply({ toolError: toMessage(error) } satisfies ToolErrorReply);
         }
       })();
       // Keeps the message channel open until `reply` is called.
@@ -81,7 +92,7 @@ async function executeTool(
     targetFrame && new Promise((resolve) => targetFrame.addEventListener('load', resolve, { once: true }));
 
   const tools = await modelContext.getTools();
-  const tool = tools.find((t) => t.name === name && t.window === window);
+  const tool = tools.find((t) => t.name === name && getToolSource(t) === window);
   if (!tool) throw new Error(`Tool "${name}" is not available on this page.`);
 
   let result: unknown = await modelContext.executeTool(tool, inputArgs);
@@ -117,10 +128,19 @@ function debouncedListTools(modelContext: WebMCP.ModelContext, fromOrigins: stri
 async function listTools(modelContext: WebMCP.ModelContext, fromOrigins: string[]): Promise<void> {
   const tools = [];
   for (const tool of await modelContext.getTools({ fromOrigins })) {
-    const frameId = tool.window === window ? 0 : await getFrameId(tool.window);
+    const source = getToolSource(tool);
+    // The document that registered the tool stopped being fully active
+    // (e.g. it navigated away) after getTools() resolved, so it can no
+    // longer run.
+    if (!source) continue;
+    const frameId = source === window ? 0 : await getFrameId(source);
     tools.push({
       description: tool.description,
-      inputSchema: tool.inputSchema,
+      // A `Tool` reports a missing schema or annotations as null, where a
+      // `RegisteredTool` left them undefined. Both are normalized to undefined
+      // so the side panel sees the same message on every Chrome version.
+      inputSchema: tool.inputSchema ?? undefined,
+      outputSchema: tool.outputSchema ?? undefined,
       readOnlyHint: tool.annotations?.readOnlyHint,
       untrustedContentHint: tool.annotations?.untrustedContentHint,
       consequentialHint: tool.annotations?.consequentialHint,
@@ -133,6 +153,15 @@ async function listTools(modelContext: WebMCP.ModelContext, fromOrigins: string[
 }
 
 /**
+ * Returns the window of the document that registered the tool, or null when
+ * that document is no longer fully active.
+ */
+// TODO: Remove the `window` fallback when Chrome 160 reaches Stable (January 5, 2027).
+function getToolSource(tool: WebMCP.Tool): Window | null {
+  return tool.source ?? tool.window ?? null;
+}
+
+/**
  * Asks a child frame for its extension frame id, which the side panel needs
  * to run the frame's tools. The copy of this script in that frame answers with
  * the id Chrome gave it (see the `GET_FRAME_ID` listener below).
@@ -142,7 +171,8 @@ async function getFrameId(targetWindow: Window): Promise<number | null> {
     const listener = ({ source, data }: MessageEvent) => {
       // `data` is attacker-controlled: any frame can post anything, including
       // null or a bare string, so never dereference it unguarded.
-      if (source === targetWindow && data?.action === 'GET_FRAME_ID_RESPONSE') {
+      if (source === targetWindow && data?.action === 'GET_FRAME_ID_RESPONSE'
+        && Number.isInteger(data.frameId) && data.frameId >= 0) {
         window.removeEventListener('message', listener);
         clearTimeout(timeoutId);
         resolve(data.frameId);
@@ -165,9 +195,19 @@ window.addEventListener('message', async ({ data, source, origin }) => {
   // Any frame can post anything here, so `data` may not be an object, and
   // `source` is null when the sending context has already gone away.
   if (data?.action !== 'GET_FRAME_ID' || !source) return;
+  // @ts-expect-error: getFrameId exists at runtime but is currently not
+  // included in all browsers and is missing from types.
+  if (chrome.runtime.getFrameId) {
+    // @ts-expect-error: getFrameId is missing in types, see above.
+    const frameId = chrome.runtime.getFrameId(source);
+    if (Number.isInteger(frameId) && frameId >= 0) {
+      (source as Window).postMessage({ action: 'GET_FRAME_ID_RESPONSE', frameId }, origin);
+      return;
+    }
+  }
   for (let attempt = 0; attempt < 10; attempt++) {
-    const frameId: number | undefined = await chrome.runtime.sendMessage({ action: 'GET_FRAME_ID' });
-    if (frameId != null) {
+    const frameId = await chrome.runtime.sendMessage({ action: 'GET_FRAME_ID' });
+    if (Number.isInteger(frameId) && frameId >= 0) {
       (source as Window).postMessage({ action: 'GET_FRAME_ID_RESPONSE', frameId }, origin);
       return;
     }
