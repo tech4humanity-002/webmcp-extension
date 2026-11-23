@@ -120,7 +120,7 @@ if (isWatch) {
   for (const [dir, names] of watched) {
     fs.watch(dir, (_event, filename) => {
       if (names === null || (filename && names.has(filename))) {
-        copyStaticFiles(rootDir, distDir);
+        copyStaticFiles(rootDir, distDir, wasameExtensionIds);
         afterBuild();
       }
     });
