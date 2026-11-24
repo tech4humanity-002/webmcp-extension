@@ -44,6 +44,7 @@ export async function submitPart1RuntimeEvidence(
       pageUrl: page.href,
       browser: input.browser.slice(0, 256),
       extensionVersion: input.extensionVersion.slice(0, 32),
+      frameCoverage: 'top-frame-only',
       tools,
     },
   };
