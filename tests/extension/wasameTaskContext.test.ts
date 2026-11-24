@@ -27,6 +27,21 @@ describe("WASAME task context handoff", () => {
     expect(validateWasameTaskContext(validContext)).toEqual(validContext);
   });
 
+  it("accepts a child envelope with the stable root identity", () => {
+    const child = {
+      ...validContext,
+      taskId: "wasame:child-1",
+      rootTaskId: "wasame:task-1",
+      parentTaskId: "wasame:task-1",
+    };
+    expect(validateWasameTaskContext(child)).toEqual(child);
+  });
+
+  it("rejects inconsistent root identity and duplicate references", () => {
+    expect(validateWasameTaskContext({ ...validContext, rootTaskId: "other-root" })).toBeNull();
+    expect(validateWasameTaskContext({ ...validContext, memoryRefs: ["memory:1", "memory:1"] })).toBeNull();
+  });
+
   it("rejects an unknown schema version", () => {
     expect(validateWasameTaskContext({ ...validContext, schemaVersion: "v0" })).toBeNull();
   });
