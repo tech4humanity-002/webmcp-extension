@@ -30,6 +30,7 @@ test('exports only current-page runtime tool metadata and no execution payload',
   assert.equal(request?.credentials, 'omit');
   const payload = JSON.parse(String(request?.body));
   assert.equal(payload.runtime.origin, 'https://example.com');
+  assert.equal(payload.runtime.frameCoverage, 'top-frame-only');
   assert.equal(payload.runtime.tools[0].name, 'search_products');
   assert.equal(payload.runtime.tools[0].readOnlyHint, true);
   assert.equal('inputArgs' in payload.runtime.tools[0], false);
