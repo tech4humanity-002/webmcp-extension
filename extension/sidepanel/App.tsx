@@ -21,6 +21,8 @@ import { useAgentSession } from './hooks/useAgentSession.js';
 import { type ContextUsage, isPromptApiSupported, prepareOnDeviceModel } from './services/promptApiBackend.js';
 import { downloadCapabilityReceipts, getCapabilityReceipts, isUnresolvedCapabilityReceipt, reconcilePendingCapabilityReceipts } from './services/t4h/receiptLedger.js';
 import { T4H_ALLOWED_ORIGINS, T4H_POLICY_ENABLED, T4H_TRIAL_ORIGIN } from './services/t4h/policy.js';
+import { getChrome, getTabInfo } from './services/extensionBridge.js';
+import { submitPart1RuntimeEvidence } from './services/part1Assessment.js';
 
 /** Starts the on-device model download; a failure only means it starts later, with the first message. */
 async function startOnDeviceModelDownload(): Promise<void> {
@@ -60,6 +62,7 @@ export function App() {
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
 
   const [showToolsDialogue, setShowToolsDialogue] = useState<boolean>(false);
+  const [part1Status, setPart1Status] = useState<string>('');
   const [showIPHPopover, setShowIPHPopover] = useState<boolean>(false);
 
   const handleToggleSensitiveActionAlerts = () => {
@@ -121,6 +124,43 @@ export function App() {
       .catch((error) => console.warn('[WebMCP] Could not reconcile or read T4H capability receipts:', error));
     return () => { active = false; };
   }, [showSettings]);
+
+  const handleSendPart1Evidence = async () => {
+    if (activeTabId == null) {
+      setPart1Status('No active browser tab is available.');
+      return;
+    }
+    try {
+      setPart1Status('Preparing read-only runtime evidence…');
+      const tab = await getTabInfo(activeTabId);
+      if (!tab?.url) throw new Error('The active tab URL is unavailable.');
+      const chromeApi = getChrome();
+      const runtimeStatus = tools.length > 0
+        ? 'available'
+        : statusMsg.toLowerCase().includes('webmcp')
+          ? 'unavailable'
+          : 'unknown';
+      const assessment = await submitPart1RuntimeEvidence({
+        url: tab.url,
+        browser: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        extensionVersion: chromeApi?.runtime?.getManifest?.().version ?? 'unknown',
+        status: runtimeStatus,
+        tools,
+      });
+      const blob = new Blob([JSON.stringify(assessment, null, 2)], { type: 'application/json' });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'webmcp-part1-' + new URL(tab.url).hostname + '.json';
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      const summary = assessment.summary as Record<string, unknown> | undefined;
+      setPart1Status('Assessment exported: ' + String(summary?.pages_inspected ?? 0) +
+        ' pages, ' + String(summary?.runtime_tools_discovered ?? 0) + ' runtime tools. No tools were invoked.');
+    } catch (error) {
+      setPart1Status(error instanceof Error ? error.message : 'Part 1 evidence export failed.');
+    }
+  };
 
   const handleExportReceipts = () => {
     void downloadCapabilityReceipts().catch((error) => {
@@ -325,6 +365,18 @@ export function App() {
                     toolsList={tools.map((t) => t.description || t.name)}
                     onClose={() => setShowToolsDialogue(false)}
                   />
+                  <div className="part1-evidence-action">
+                    <button
+                      type="button"
+                      className="action-chip"
+                      onClick={handleSendPart1Evidence}
+                      disabled={activeTabId == null || !origin}
+                    >
+                      Send runtime evidence to Part 1
+                    </button>
+                    <p className="muted">Sends this page URL and discovered tool schemas for assessment. No tools are invoked.</p>
+                    {part1Status && <p className="muted" role="status">{part1Status}</p>}
+                  </div>
                 </div>
               )}
 
