@@ -47,17 +47,20 @@ function validUrl(value: unknown): value is string | undefined {
 function stringList(value: unknown): value is string[] {
   return Array.isArray(value) &&
     value.length <= 25 &&
-    value.every(item => boundedString(item, 512, true));
+    value.every(item => boundedString(item, 512, true)) &&
+    new Set(value).size === value.length;
 }
 
 export function validateWasameTaskContext(value: unknown): WasameTaskContext | null {
   if (!isRecord(value)) return null;
   if (value.schemaVersion !== "wasame.task-context.v1") return null;
   if (!boundedString(value.taskId, 128, true) || !boundedString(value.rootTaskId, 128, true)) return null;
-  if (value.parentTaskId !== undefined && !boundedString(value.parentTaskId, 128, true)) return null;
+  if (value.parentTaskId !== undefined && (!boundedString(value.parentTaskId, 128, true) || value.parentTaskId === value.taskId)) return null;
+  if (value.parentTaskId === undefined && value.rootTaskId !== value.taskId) return null;
+  if (value.parentTaskId !== undefined && value.rootTaskId === value.taskId) return null;
   if (!boundedString(value.rootIntent, 4000, true) || !boundedString(value.currentQuestion, 4000, true)) return null;
   if (!validUrl(value.activeUrl) || !validUrl(value.returnUrl)) return null;
-  if (!stringList(value.childTaskIds) || !stringList(value.memoryRefs) ||
+  if (!stringList(value.childTaskIds) || value.childTaskIds.includes(value.taskId) || !stringList(value.memoryRefs) ||
       !stringList(value.decisionRefs) || !stringList(value.evidenceRefs)) return null;
   if (value.status !== "active" && value.status !== "completed") return null;
   if (!boundedString(value.createdAt, 64, true) || !Number.isFinite(Date.parse(value.createdAt))) return null;
